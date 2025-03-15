@@ -54,6 +54,9 @@ const validateSchema = (schemaNode, instanceNode) => {
         return new Output(schemaNode.value, schemaNode, instanceNode);
       case "object":
         let isValid = true;
+        /** @type {Output[]} */
+        const errors = [];
+
         for (const propertyNode of schemaNode.children) {
           const [keywordNode, keywordValueNode] = propertyNode.children;
           const keywordHandler = keywordHandlers.get(keywordNode.value);
@@ -61,11 +64,15 @@ const validateSchema = (schemaNode, instanceNode) => {
             const keywordOutput = keywordHandler(keywordValueNode, instanceNode, schemaNode);
             if (!keywordOutput.valid) {
               isValid = false;
+              // Collect errors from keyword validation
+              if (keywordOutput.errors) {
+                errors.push(...keywordOutput.errors);
+              }
             }
           }
         }
 
-        return new Output(isValid, schemaNode, instanceNode);
+        return new Output(isValid, schemaNode, instanceNode, errors);
     }
   }
 
@@ -158,13 +165,20 @@ keywordHandlers.set("allOf", (allOfNode, instanceNode) => {
   assertNodeType(allOfNode, "array");
 
   let isValid = true;
+  /** @type {Output[]} */
+  const errors = [];
+
   for (const schemaNode of allOfNode.children) {
-    if (!validateSchema(schemaNode, instanceNode).valid) {
+    const schemaOutput = validateSchema(schemaNode, instanceNode);
+    if (!schemaOutput.valid) {
       isValid = false;
+      if (schemaOutput.errors) {
+        errors.push(...schemaOutput.errors);
+      }
     }
   }
 
-  return new Output(isValid, allOfNode, instanceNode);
+  return new Output(isValid, allOfNode, instanceNode, errors);
 });
 
 keywordHandlers.set("anyOf", (anyOfNode, instanceNode) => {
